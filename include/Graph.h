@@ -14,6 +14,8 @@ public:
   bool has_node(int original_id) const;
   int get_degree(int original_id) const;
   void k_core_decomposition(const std::string &filename);
+  void find_densest_subgraph_exact(const std::string &filename);
+  void find_densest_subgraph_approx(const std::string &filename);
 
 private:
   std::vector<std::unordered_set<int>> adj;
