@@ -1,3 +1,4 @@
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,6 +17,7 @@ public:
   void k_core_decomposition(const std::string &filename);
   void find_densest_subgraph_exact(const std::string &filename);
   void find_densest_subgraph_approx(const std::string &filename);
+  void find_k_cliques(int k, const std::string &filename);
 
 private:
   std::vector<std::unordered_set<int>> adj;
@@ -28,4 +30,7 @@ private:
   get_neighbors_by_internal_id(int internal_id) const;
   int get_original_id(int internal_id) const;
   void load_graph_from_file(const std::string &filename);
+  void bron_kerbosch_pivot(std::vector<int> R, std::unordered_set<int> P,
+                           std::unordered_set<int> X,
+                           std::vector<std::vector<int>> &cliques);
 };
