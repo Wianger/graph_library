@@ -21,7 +21,6 @@ public:
   void find_densest_subgraph_approx(const std::string &filename);
   void find_k_cliques(int k, const std::string &filename);
   void find_k_clique_decomposition(int k, const std::string &output_path);
-  void find_k_vcc(int k, const std::string &output_path);
 
 private:
   struct Separation {
@@ -42,10 +41,4 @@ private:
   void bron_kerbosch_pivot(std::vector<int> R, std::unordered_set<int> P,
                            std::unordered_set<int> X,
                            std::vector<std::vector<int>> &cliques);
-
-  // For k-vcc
-  std::pair<int, std::vector<int>>
-  get_vertex_connectivity(int u, int v, const std::set<int> &nodes);
-  void find_k_vcc_recursive(const std::set<int> &current_nodes, int k,
-                            std::vector<std::vector<int>> &results);
 };
