@@ -6,6 +6,10 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
+#include <map>
+#include <queue>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -99,9 +103,9 @@ void Graph::load_graph_from_file(const std::string &filename) {
       continue;
     }
     std::istringstream iss(line);
-  int u, v;
+    int u, v;
     if (iss >> u >> v) {
-    add_edge(u, v);
+      add_edge(u, v);
     }
   }
 }
@@ -165,27 +169,116 @@ void Graph::find_k_cliques(int k, const std::string &filename) {
   std::ofstream outputFile(filename);
   auto start_load = std::chrono::high_resolution_clock::now();
 
-  std::vector<std::vector<int>> all_cliques;
+  std::vector<std::vector<int>> all_maximal_cliques;
   std::unordered_set<int> P, X;
   for (int i = 0; i < get_node_count(); ++i) {
     P.insert(i);
   }
+  bron_kerbosch_pivot({}, P, X, all_maximal_cliques);
 
-  bron_kerbosch_pivot({}, P, X, all_cliques);
+  std::set<std::vector<int>> unique_k_cliques;
+
+  std::function<void(const std::vector<int> &, int, int, std::vector<int> &)>
+      find_combinations = [&](const std::vector<int> &source, int n, int r,
+                              std::vector<int> &current_combination) {
+        if (current_combination.size() == r) {
+          std::vector<int> sorted_combo = current_combination;
+          std::sort(sorted_combo.begin(), sorted_combo.end());
+          unique_k_cliques.insert(sorted_combo);
+          return;
+        }
+        if (n < 0)
+          return;
+
+        // Include current element
+        current_combination.push_back(source[n]);
+        find_combinations(source, n - 1, r, current_combination);
+        current_combination.pop_back();
+
+        // Exclude current element
+        find_combinations(source, n - 1, r, current_combination);
+      };
+
+  for (const auto &m_clique_internal : all_maximal_cliques) {
+    if (m_clique_internal.size() >= k) {
+      std::vector<int> m_clique_original;
+      for (int node : m_clique_internal)
+        m_clique_original.push_back(get_original_id(node));
+
+      std::vector<int> current_combination;
+      find_combinations(m_clique_original, m_clique_original.size() - 1, k,
+                        current_combination);
+    }
+  }
 
   auto end_load = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> load_duration =
       end_load - start_load;
   outputFile << load_duration.count() << " ms\n";
 
-  for (const auto &clique : all_cliques) {
-    if (clique.size() >= k) {
-      for (size_t i = 0; i < clique.size(); ++i) {
-        outputFile << get_original_id(clique[i])
-                   << (i == clique.size() - 1 ? "" : " ");
-      }
-      outputFile << "\n";
+  for (const auto &clique : unique_k_cliques) {
+    for (size_t i = 0; i < clique.size(); ++i) {
+      outputFile << clique[i] << (i == clique.size() - 1 ? "" : " ");
     }
+    outputFile << "\n";
+  }
+  outputFile.close();
+}
+
+void Graph::find_k_clique_decomposition(int k, const std::string &output_path) {
+  ensure_directory_exists(output_path);
+  std::ofstream outputFile(output_path);
+  auto start_time = std::chrono::high_resolution_clock::now();
+
+  std::vector<std::vector<int>> all_cliques_internal;
+  std::unordered_set<int> P, X;
+  for (int i = 0; i < get_node_count(); ++i) {
+    P.insert(i);
+  }
+  bron_kerbosch_pivot({}, P, X, all_cliques_internal);
+
+  std::vector<std::vector<int>> k_cliques;
+  for (const auto &clique_internal : all_cliques_internal) {
+    if (clique_internal.size() >= k) {
+      std::vector<int> clique_original;
+      for (int internal_id : clique_internal) {
+        clique_original.push_back(get_original_id(internal_id));
+      }
+      std::sort(clique_original.begin(), clique_original.end());
+      k_cliques.push_back(clique_original);
+    }
+  }
+
+  std::sort(k_cliques.begin(), k_cliques.end(),
+            [](const auto &a, const auto &b) { return a.size() > b.size(); });
+
+  std::vector<std::vector<int>> maximal_cliques;
+  if (!k_cliques.empty()) {
+    maximal_cliques.push_back(k_cliques[0]);
+    for (size_t i = 1; i < k_cliques.size(); ++i) {
+      bool is_subset = false;
+      for (const auto &final_clique : maximal_cliques) {
+        if (std::includes(final_clique.begin(), final_clique.end(),
+                          k_cliques[i].begin(), k_cliques[i].end())) {
+          is_subset = true;
+          break;
+        }
+      }
+      if (!is_subset) {
+        maximal_cliques.push_back(k_cliques[i]);
+      }
+    }
+  }
+
+  auto end_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> duration = end_time - start_time;
+  outputFile << duration.count() << " ms\n";
+
+  for (const auto &clique : maximal_cliques) {
+    for (size_t i = 0; i < clique.size(); ++i) {
+      outputFile << clique[i] << (i == clique.size() - 1 ? "" : " ");
+    }
+    outputFile << "\n";
   }
   outputFile.close();
 }
@@ -299,7 +392,7 @@ void Graph::find_densest_subgraph_exact(const std::string &filename) {
       low = g;
     } else {
       high = g;
-  }
+    }
   }
 
   std::vector<int> best_subgraph_nodes;
@@ -486,4 +579,193 @@ void Graph::find_densest_subgraph_approx(const std::string &filename) {
   for (int node : densest_subgraph_nodes)
     outputFile << node << " ";
   outputFile << "\n";
+}
+
+// k-VCC Implementation
+std::pair<int, std::vector<int>>
+Graph::get_vertex_connectivity(int u_orig, int v_orig,
+                               const std::set<int> &nodes_orig) {
+  const int INF = std::numeric_limits<int>::max();
+  Dinic<int> flow_network(2 * nodes_orig.size());
+
+  std::map<int, int> node_to_flow_idx;
+  int current_flow_idx = 0;
+  for (int node : nodes_orig) {
+    node_to_flow_idx[node] = current_flow_idx++;
+  }
+
+  int u_flow_idx = node_to_flow_idx[u_orig];
+  int v_flow_idx = node_to_flow_idx[v_orig];
+
+  for (int node : nodes_orig) {
+    int flow_idx = node_to_flow_idx[node];
+    int in_node = 2 * flow_idx;
+    int out_node = 2 * flow_idx + 1;
+
+    int capacity = 1;
+    if (node == u_orig || node == v_orig) {
+      capacity = INF;
+    }
+    flow_network.add_edge(in_node, out_node, capacity);
+  }
+
+  for (int node1_orig : nodes_orig) {
+    if (original_to_internal_id.count(node1_orig)) {
+      int node1_internal = original_to_internal_id.at(node1_orig);
+      for (int node2_internal : adj[node1_internal]) {
+        int node2_orig = internal_to_original_id[node2_internal];
+        if (nodes_orig.count(node2_orig)) {
+          int idx1_out = 2 * node_to_flow_idx[node1_orig] + 1;
+          int idx2_in = 2 * node_to_flow_idx[node2_orig];
+          flow_network.add_edge(idx1_out, idx2_in, INF);
+        }
+      }
+    }
+  }
+
+  int flow = flow_network.max_flow(2 * u_flow_idx + 1, 2 * v_flow_idx);
+
+  std::vector<int> separator;
+  if (flow < INF) {
+    std::vector<bool> reachable =
+        flow_network.get_reachable_nodes(2 * u_flow_idx + 1);
+    for (int node : nodes_orig) {
+      if (node == u_orig || node == v_orig)
+        continue;
+      int flow_idx = node_to_flow_idx[node];
+      int in_node = 2 * flow_idx;
+      int out_node = 2 * flow_idx + 1;
+      if (reachable[in_node] && !reachable[out_node]) {
+        separator.push_back(node);
+      }
+    }
+  }
+
+  return {flow, separator};
+}
+
+void Graph::find_k_vcc_recursive(const std::set<int> &current_nodes, int k,
+                                 std::vector<std::vector<int>> &results) {
+  if (current_nodes.size() < k) {
+    return;
+  }
+
+  std::vector<int> node_vec(current_nodes.begin(), current_nodes.end());
+
+  for (size_t i = 0; i < node_vec.size(); ++i) {
+    for (size_t j = i + 1; j < node_vec.size(); ++j) {
+      int u = node_vec[i];
+      int v = node_vec[j];
+
+      int u_internal = original_to_internal_id.at(u);
+      int v_internal = original_to_internal_id.at(v);
+      bool is_adjacent = adj[u_internal].count(v_internal);
+
+      if (is_adjacent) {
+        continue;
+      }
+
+      auto [conn, separator] = get_vertex_connectivity(u, v, current_nodes);
+
+      if (conn < k) {
+        std::set<int> nodes_to_partition = current_nodes;
+        for (int sep_node : separator) {
+          nodes_to_partition.erase(sep_node);
+        }
+
+        std::set<int> remaining_nodes = nodes_to_partition;
+        while (!remaining_nodes.empty()) {
+          std::set<int> component;
+          std::queue<int> q;
+          int start_node_orig = *remaining_nodes.begin();
+
+          q.push(start_node_orig);
+          component.insert(start_node_orig);
+          remaining_nodes.erase(start_node_orig);
+
+          while (!q.empty()) {
+            int u_bfs_orig = q.front();
+            q.pop();
+            int u_bfs_internal = original_to_internal_id.at(u_bfs_orig);
+
+            for (int v_bfs_internal : adj[u_bfs_internal]) {
+              int v_bfs_orig = internal_to_original_id[v_bfs_internal];
+              if (remaining_nodes.count(v_bfs_orig)) {
+                component.insert(v_bfs_orig);
+                remaining_nodes.erase(v_bfs_orig);
+                q.push(v_bfs_orig);
+              }
+            }
+          }
+
+          std::set<int> next_subgraph = component;
+          next_subgraph.insert(separator.begin(), separator.end());
+          find_k_vcc_recursive(next_subgraph, k, results);
+        }
+        return;
+      }
+    }
+  }
+
+  results.emplace_back(node_vec);
+}
+
+void Graph::find_k_vcc(int k, const std::string &output_path) {
+  auto start = std::chrono::high_resolution_clock::now();
+
+  std::vector<std::vector<int>> results;
+  std::set<int> all_nodes;
+  for (const auto &orig_id : internal_to_original_id) {
+    all_nodes.insert(orig_id);
+  }
+
+  if (all_nodes.size() >= k) {
+    find_k_vcc_recursive(all_nodes, k, results);
+  }
+
+  for (auto &res : results) {
+    std::sort(res.begin(), res.end());
+  }
+
+  std::sort(results.begin(), results.end(),
+            [](const auto &a, const auto &b) { return a.size() > b.size(); });
+
+  std::vector<std::vector<int>> final_results;
+  if (!results.empty()) {
+    final_results.push_back(results[0]);
+    for (size_t i = 1; i < results.size(); ++i) {
+      bool is_subset = false;
+      for (const auto &final_res : final_results) {
+        if (std::includes(final_res.begin(), final_res.end(),
+                          results[i].begin(), results[i].end())) {
+          is_subset = true;
+          break;
+        }
+      }
+      if (!is_subset) {
+        final_results.push_back(results[i]);
+      }
+    }
+  }
+
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> diff = end - start;
+  std::cout << "k-VCC decomposition found " << final_results.size()
+            << " components in " << diff.count() << "s." << std::endl;
+
+  ensure_directory_exists(output_path);
+  std::ofstream outfile(output_path);
+  if (!outfile.is_open()) {
+    std::cerr << "Error opening k-vcc output file: " << output_path
+              << std::endl;
+    return;
+  }
+
+  outfile << diff.count() << "s" << std::endl;
+  for (const auto &vcc : final_results) {
+    for (size_t i = 0; i < vcc.size(); ++i) {
+      outfile << vcc[i] << (i == vcc.size() - 1 ? "" : " ");
+    }
+    outfile << std::endl;
+  }
 }

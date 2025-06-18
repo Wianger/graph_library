@@ -144,8 +144,30 @@ template <typename T> std::vector<int> Dinic<T>::get_t_side_nodes(int t) {
   return t_side_nodes;
 }
 
+template <typename T> std::vector<bool> Dinic<T>::get_reachable_nodes(int s) {
+  std::vector<bool> reachable(V, false);
+  std::queue<int> q;
+
+  q.push(s);
+  reachable[s] = true;
+
+  while (!q.empty()) {
+    int u = q.front();
+    q.pop();
+
+    for (const auto &edge : adj[u]) {
+      if (!reachable[edge.to] && edge.capacity > 0) {
+        reachable[edge.to] = true;
+        q.push(edge.to);
+      }
+    }
+  }
+  return reachable;
+}
+
 // --- 顯式模板實例化 ---
 // 這告訴編譯器生成 Dinic<long long> 和 Dinic<double> 的代碼。
 // 如果您需要其他類型，可以在這裡添加。
 template class Dinic<long long>;
 template class Dinic<double>;
+template class Dinic<int>;

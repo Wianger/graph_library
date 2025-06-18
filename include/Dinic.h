@@ -22,6 +22,7 @@ public:
   T max_flow(int s, int t);
   std::vector<int> get_min_cut_nodes(int s);
   std::vector<int> get_t_side_nodes(int t);
+  std::vector<bool> get_reachable_nodes(int s);
 
 private:
   const int V; // 頂點數量
