@@ -34,6 +34,8 @@ void process_graph(const std::string &filename) {
     Graph g("../data/" + filename);
     std::cout << "Graph loaded. Nodes: " << g.get_node_count()
               << ", Edges: " << g.get_edge_count() << std::endl;
+    std::cout << "Average degree: " << g.averageDegree() << std::endl;
+    std::cout << "Density: " << g.density() << std::endl;
 
     // --- 1. K-Core Decomposition & Visualization ---
     std::cout << "\n[1] Running k-core decomposition...\n";
@@ -44,6 +46,7 @@ void process_graph(const std::string &filename) {
     for (int original_id : all_nodes) {
       max_core = std::max(max_core, g.get_coreness(original_id));
     }
+    std::cout << "Max coreness: " << max_core << std::endl;
     for (int original_id : all_nodes) {
       int coreness = g.get_coreness(original_id);
       if (coreness > max_core / 2) { // Style nodes in the upper half of cores
@@ -59,51 +62,52 @@ void process_graph(const std::string &filename) {
               << " are highlighted)\n";
 
     // --- 2. Densest Subgraph (Approximate) & Visualization ---
-    std::cout << "\n[2] Finding approximate densest subgraph...\n";
-    g.find_densest_subgraph_approx("../results/" + prefix +
-                                   "_densest_approx.txt");
-    std::ifstream densest_file("../results/" + prefix + "_densest_approx.txt");
-    if (densest_file.is_open()) {
-      std::string line;
-      std::getline(densest_file, line); // Skip time
-      std::getline(densest_file, line); // Skip density
-      std::getline(densest_file, line); // Get nodes
-      std::stringstream ss(line);
-      int node_id;
-      std::map<int, std::string> densest_styles;
-      while (ss >> node_id) {
-        densest_styles[node_id] = "style=filled, fillcolor=red";
-      }
-      g.export_to_dot("../results/" + prefix + "_densest_approx.dot",
-                      densest_styles);
-      std::cout << "  -> Generated " << prefix
-                << "_densest_approx.dot with densest subgraph highlighted\n";
-    }
+    // std::cout << "\n[2] Finding approximate densest subgraph...\n";
+    // g.find_densest_subgraph_approx("../results/" + prefix +
+    //                                "_densest_approx.txt");
+    // std::ifstream densest_file("../results/" + prefix +
+    // "_densest_approx.txt"); if (densest_file.is_open()) {
+    //   std::string line;
+    //   std::getline(densest_file, line); // Skip time
+    //   std::getline(densest_file, line); // Skip density
+    //   std::getline(densest_file, line); // Get nodes
+    //   std::stringstream ss(line);
+    //   int node_id;
+    //   std::map<int, std::string> densest_styles;
+    //   while (ss >> node_id) {
+    //     densest_styles[node_id] = "style=filled, fillcolor=red";
+    //   }
+    //   g.export_to_dot("../results/" + prefix + "_densest_approx.dot",
+    //                   densest_styles);
+    //   std::cout << "  -> Generated " << prefix
+    //             << "_densest_approx.dot with densest subgraph highlighted\n";
+    // }
 
     // --- 3. K-Clique Decomposition (only on CondMat) ---
-    if (prefix == "CondMat") {
-      int k = 10;
-      std::cout << "\n[3] Finding " << k << "-clique decomposition...\n";
-      g.find_k_clique_decomposition(k, "../results/" + prefix +
-                                           "_clique_decomp.txt");
-      std::ifstream clique_file("../results/" + prefix + "_clique_decomp.txt");
-      if (clique_file.is_open()) {
-        std::string line;
-        std::getline(clique_file, line); // skip time
-        std::map<int, std::string> clique_styles;
-        while (std::getline(clique_file, line)) {
-          std::stringstream ss(line);
-          int node_id;
-          while (ss >> node_id) {
-            clique_styles[node_id] = "style=filled, fillcolor=blue";
-          }
-        }
-        g.export_to_dot("../results/" + prefix + "_clique_decomp.dot",
-                        clique_styles);
-        std::cout << "  -> Generated " << prefix << "_clique_decomp.dot with "
-                  << k << "-cliques highlighted\n";
-      }
-    }
+    // if (prefix == "CondMat") {
+    //   int k = 10;
+    //   std::cout << "\n[3] Finding " << k << "-clique decomposition...\n";
+    //   g.find_k_clique_decomposition(k, "../results/" + prefix +
+    //                                        "_clique_decomp.txt");
+    //   std::ifstream clique_file("../results/" + prefix +
+    //   "_clique_decomp.txt"); if (clique_file.is_open()) {
+    //     std::string line;
+    //     std::getline(clique_file, line); // skip time
+    //     std::map<int, std::string> clique_styles;
+    //     while (std::getline(clique_file, line)) {
+    //       std::stringstream ss(line);
+    //       int node_id;
+    //       while (ss >> node_id) {
+    //         clique_styles[node_id] = "style=filled, fillcolor=blue";
+    //       }
+    //     }
+    //     g.export_to_dot("../results/" + prefix + "_clique_decomp.dot",
+    //                     clique_styles);
+    //     std::cout << "  -> Generated " << prefix << "_clique_decomp.dot with
+    //     "
+    //               << k << "-cliques highlighted\n";
+    //   }
+    // }
 
   } catch (const std::exception &e) {
     std::cerr << "Error processing " << filename << ": " << e.what()
